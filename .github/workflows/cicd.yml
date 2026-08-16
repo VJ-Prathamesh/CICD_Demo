@@ -1,0 +1,70 @@
+name: Full CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-test-push-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # 1. Get source code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # 3. Install dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Run tests
+      - name: Run tests
+        run: npm test
+
+      # 5. Login to Docker Hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 6. Build Docker image
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/cicd-node-demo:latest .
+
+      # 7. Push Docker image
+      - name: Push Docker image
+        run: |
+          docker push \
+            ${{ secrets.DOCKERHUB_USERNAME }}/cicd-node-demo:latest
+
+      # 8. Deploy to EC2
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/cicd-node-demo:latest
+
+            sudo docker stop cicd-demo-container || true
+
+            sudo docker rm cicd-demo-container || true
+
+            sudo docker run -d \
+              --name cicd-demo-container \
+              --restart unless-stopped \
+              -p 3000:3000 \
+              ${{ secrets.DOCKERHUB_USERNAME }}/cicd-node-demo:latest
