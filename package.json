@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node -e \"console.log('Tests passed successfully')\""
+    "test": "node test.js"
   },
   "keywords": [],
   "author": "",
